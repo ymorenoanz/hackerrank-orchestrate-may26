@@ -145,8 +145,8 @@ def triage(
     if "identity" in text and "stolen" in text:
         return {
             "status": "escalated",
-            "product_area": "security",
-            "response": "Your identity has been stolen and your account has been compromised.",
+            "product_area": "fraud",
+            "response": "Your case has been escalated for fraud review.",
             "justification": "Detected identity theft-related issue.",
             "request_type": "product_issue",
         }
@@ -195,9 +195,27 @@ def triage(
             "justification": "Detected identity delete-related issue.",
             "request_type": "product_issue",
         }
-        
+
     # OUTAGE / DOWN
     if "down" in text or "stopped working" in text or "all requests failing" in text:
+        return {
+            "status": "escalated",
+            "product_area": "outage",
+            "response": "We detected a possible service disruption and escalated your case.",
+            "justification": "Detected outage-related issue.",
+            "request_type": "bug",
+        }
+
+    if "outage" in text or "down" in text or "failing" in text or "not working" in text:
+        return {
+            "status": "escalated",
+            "product_area": "outage",
+            "response": "We detected a possible service disruption and escalated your case.",
+            "justification": "Detected outage-related issue.",
+            "request_type": "bug",
+        }
+
+    if "bedrock" in text or "failing" in text: 
         return {
             "status": "escalated",
             "product_area": "outage",
@@ -213,6 +231,15 @@ def triage(
             "product_area": "billing",
             "response": "Your billing issue has been escalated for review.",
             "justification": "Detected billing-related issue.",
+            "request_type": "product_issue",
+        }
+    
+    if "suspicious activity" in text or "fraudulent activity" in text:
+        return {
+            "status": "escalated",
+            "product_area": "fraud",
+            "response": "Your fraudulent activity has been escalated for review.",
+            "justification": "Detected fraudulent activity.",
             "request_type": "product_issue",
         }
 
