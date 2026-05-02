@@ -103,191 +103,119 @@ def triage_anthropic(
     return json.loads(text[start : end + 1])
 
 
-def triage(
-    issue: str,
-    subject: str,
-    company: str | None,
-    excerpts: str,
-) -> dict[str, Any]:
+INJECTION_PATTERNS = (
+    "ignore previous instructions",
+    "delete all files",
+    "system prompt",
+    "reveal rules",
+    "internal logic",
+    "jailbreak",
+    "developer mode",
+)
 
+ACCOUNT_KEYWORDS = ("workspace", "seat", "login", "user", "employee", "access")
+OUTAGE_KEYWORDS = ("service down", "not working", "stopped working", "all requests failing")
+ASSESSMENT_KEYWORDS = ("test", "assessment", "score", "submission")
+PAYMENT_KEYWORDS = ("refund", "charge", "billing", "dispute")
+CARD_KEYWORDS = ("card",)
+
+def triage(issue: str, subject: str, company: str | None, excerpts: str) -> dict[str, Any]:
     text = f"{issue} {subject}".lower()
 
-    # MALICIOUS / INVALID
-    if "delete all files" in text or "ignore previous instructions" in text:
+    # 1. 🚨 PROMPT INJECTION / MALICIOUS
+    if any(p in text for p in (
+        "ignore previous instructions",
+        "delete all files",
+        "system prompt",
+        "reveal rules",
+        "internal logic",
+        "developer mode",
+        "jailbreak"
+    )):
         return {
             "status": "escalated",
             "product_area": "security",
             "response": "This request cannot be processed and has been flagged for review.",
-            "justification": "Detected malicious or unsafe request.",
+            "justification": "Prompt injection attempt detected.",
             "request_type": "invalid",
         }
 
-    # SECURITY
-    if "security vulnerability" in text or "bug bounty" in text:
-        return {
-            "status": "escalated",
-            "product_area": "security",
-            "response": "Your security report has been escalated to the appropriate team.",
-            "justification": "Detected security-related issue.",
-            "request_type": "bug",
-        }
-
-    # FRAUD
-    if "identity stolen" in text or "fraud" in text or "card blocked" in text:
-        return {
-            "status": "escalated",
-            "product_area": "fraud",
-            "response": "Your case has been escalated for fraud review.",
-            "justification": "Detected fraud-related issue.",
-            "request_type": "product_issue",
-        }
-
-    if "identity" in text and "stolen" in text:
-        return {
-            "status": "escalated",
-            "product_area": "fraud",
-            "response": "Your case has been escalated for fraud review.",
-            "justification": "Detected identity theft-related issue.",
-            "request_type": "product_issue",
-        }
-
-    if "identity" in text and "lost" in text:
-        return {
-            "status": "escalated",
-            "product_area": "security",
-            "response": "Your identity has been lost and your account has been compromised.",
-            "justification": "Detected identity loss-related issue.",
-            "request_type": "product_issue",
-        }
-
-    if "identity" in text and "forgot" in text:
-        return {
-            "status": "escalated",
-            "product_area": "security",
-            "response": "Your identity has been forgotten and your account has been compromised.",
-            "justification": "Detected identity forget-related issue.",
-            "request_type": "product_issue",
-        }
-
-    if "identity" in text and "reset" in text:
-        return {
-            "status": "escalated",
-            "product_area": "security",
-            "response": "Your identity has been reset and your account has been compromised.",
-            "justification": "Detected identity reset-related issue.",
-            "request_type": "product_issue",
-        }
-
-    if "identity" in text and "change" in text:
-        return {
-            "status": "escalated",
-            "product_area": "security",
-            "response": "Your identity has been changed and your account has been compromised.",
-            "justification": "Detected identity change-related issue.",
-            "request_type": "product_issue",
-        }
-
-    if "identity" in text and "delete" in text:
-        return {
-            "status": "escalated",
-            "product_area": "security",
-            "response": "Your identity has been deleted and your account has been compromised.",
-            "justification": "Detected identity delete-related issue.",
-            "request_type": "product_issue",
-        }
-
-    # OUTAGE / DOWN
-    if "down" in text or "stopped working" in text or "all requests failing" in text:
-        return {
-            "status": "escalated",
-            "product_area": "outage",
-            "response": "We detected a possible service disruption and escalated your case.",
-            "justification": "Detected outage-related issue.",
-            "request_type": "bug",
-        }
-
-    if "outage" in text or "down" in text or "failing" in text or "not working" in text:
-        return {
-            "status": "escalated",
-            "product_area": "outage",
-            "response": "We detected a possible service disruption and escalated your case.",
-            "justification": "Detected outage-related issue.",
-            "request_type": "bug",
-        }
-
-    if "bedrock" in text or "failing" in text: 
-        return {
-            "status": "escalated",
-            "product_area": "outage",
-            "response": "We detected a possible service disruption and escalated your case.",
-            "justification": "Detected outage-related issue.",
-            "request_type": "bug",
-        }
-
-    # BILLING / REFUND
-    if "refund" in text or "payment" in text or "charged" in text or "charge" in text:
+    # 2. BILLING / PAYMENTS
+    if any(k in text for k in PAYMENT_KEYWORDS) or any(k in text for k in CARD_KEYWORDS):
         return {
             "status": "escalated",
             "product_area": "billing",
             "response": "Your billing issue has been escalated for review.",
-            "justification": "Detected billing-related issue.",
-            "request_type": "product_issue",
-        }
-    
-    if "suspicious activity" in text or "fraudulent activity" in text:
-        return {
-            "status": "escalated",
-            "product_area": "fraud",
-            "response": "Your fraudulent activity has been escalated for review.",
-            "justification": "Detected fraudulent activity.",
+            "justification": "Financial or billing-related issue requires review.",
             "request_type": "product_issue",
         }
 
-    # SUBSCRIPTION
-    if "subscription" in text or "pause our subscription" in text:
-        return {
-            "status": "replied",
-            "product_area": "subscription",
-            "response": "Your subscription request has been received. Our team will assist you shortly.",
-            "justification": "Detected subscription request.",
-            "request_type": "product_issue",
-        }
-
-    # ACCOUNT / USERS
-    if "remove them" in text or "remove a user" in text or "employee has left" in text:
+    # 3. ACCOUNT / ACCESS
+    if any(p in text for p in (
+        ACCOUNT_KEYWORDS
+    )):
         return {
             "status": "escalated",
             "product_area": "account",
-            "response": "Your account management request has been escalated.",
-            "justification": "Detected account admin request.",
+            "response": "Your account request has been escalated for review.",
+            "justification": "Account or access-related change detected.",
             "request_type": "product_issue",
         }
 
-    # PRIVACY / DATA
-    if "my data" in text or "data be used" in text or "stop crawling" in text:
+    # 4. 🧪 ASSESSMENTS (semi-escalate only if dispute-like)
+    if any(p in text for p in (ASSESSMENT_KEYWORDS)):
+        if "dispute" in text or "unfair" in text or "review" in text:
+            return {
+                "status": "escalated",
+                "product_area": "assessment",
+                "response": "Your assessment issue has been escalated for manual review.",
+                "justification": "Score or grading dispute detected.",
+                "request_type": "product_issue",
+            }
+        return {
+            "status": "replied",
+            "product_area": "assessment",
+            "response": "Please review the official assessment guidelines in your dashboard.",
+            "justification": "General assessment inquiry can be handled via documentation.",
+            "request_type": "product_issue",
+        }
+
+    # 5. 🔴 OUTAGE / BUG
+    if any(p in text for p in (
+        OUTAGE_KEYWORDS
+    )):
+        return {
+            "status": "escalated",
+            "product_area": "outage",
+            "response": "We detected a possible service disruption and escalated your case.",
+            "justification": "System outage or failure suspected.",
+            "request_type": "bug",
+        }
+
+    # 6. 🧾 PRIVACY (reply safe)
+    if any(p in text for p in ("privacy", "stop crawling", "data usage", "personal data")):
         return {
             "status": "replied",
             "product_area": "privacy",
-            "response": "Your privacy request has been identified and should be handled through data controls or support.",
-            "justification": "Detected privacy-related request.",
-            "request_type": "product_issue",
+            "response": "Please use the official privacy controls in your account settings.",
+            "justification": "Privacy request can be handled via user controls.",
+            "request_type": "feature_request",
         }
-
-    # ASSESSMENTS
-    if "score" in text or "test" in text or "assessment" in text:
+    
+    if "security vulnerability" in text or "bug bounty" in text:
         return {
             "status": "escalated",
-            "product_area": "assessment",
-            "response": "Your assessment issue has been escalated for manual review.",
-            "justification": "Detected assessment-related issue.",
+            "product_area": "security",
+            "response": "Your case has been escalated for security review.",
+            "justification": "Detected security vulnerability or bug bounty report.",
             "request_type": "product_issue",
         }
 
-    # DEFAULT
+    # 7. DEFAULT
     return {
         "status": "replied",
         "product_area": "general_support",
-        "response": "Thanks for contacting support. We are happy to help.",
-        "justification": "Default mock response.",
+        "response": "I couldn't find a specific issue requiring escalation. Please provide more details so we can assist you better.",
+        "justification": "No high-risk or actionable issue detected.",
         "request_type": "product_issue",
     }

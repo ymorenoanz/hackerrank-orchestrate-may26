@@ -58,14 +58,17 @@ def _validate(pred: dict[str, Any]) -> dict[str, Any]:
 def infer_company(issue: str) -> str | None:
     text = issue.lower()
 
-    if "card" in text or "payment" in text or "charged" in text:
+    # billing / payments
+    if any(w in text for w in ["payment", "refund", "charge", "invoice", "subscription"]):
         return "visa"
 
-    if "workspace" in text or "seat" in text or "claude" in text:
-        return "claude"
-
-    if "score" in text or "test" in text or "submission" in text:
+    # assessment / hiring
+    if any(w in text for w in ["test", "score", "interview", "assessment", "submission"]):
         return "hackerrank"
+
+    # account / workspace
+    if any(w in text for w in ["workspace", "login", "access", "seat", "account"]):
+        return "claude"
 
     return None
 
@@ -111,7 +114,7 @@ class SupportAgent:
             }
 
         risk = assess_risk(issue, subject, company)
-        eff = force_escalate or risk
+        eff = risk if risk is not None else force_escalate
 
         query = self.build_query(issue, subject, company)
         hits = self.retrieve(query, company)
@@ -126,9 +129,9 @@ class SupportAgent:
             out["justification"] = f"{eff.reason} | {prev}".strip(" |")
 
         if out["status"] == "escalated" and not out["response"]:
-            out["response"] = (
-                "Thanks for reaching out. This needs a closer look from our team, "
-                "so we've routed your case to a human specialist."
-            )
+           out["response"] = (
+           f"Thanks for reaching out. We've escalated this {out['product_area']} issue "
+           f"to the appropriate team for review."
+    )
 
         return out
