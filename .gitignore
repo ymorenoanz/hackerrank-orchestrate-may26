@@ -15,6 +15,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
+
 # build
 dist/
 build/
@@ -31,3 +32,6 @@ data/index/
 data/embeddings/
 *.sqlite
 *.db
+
+#other file
+llm_client_backup.py
