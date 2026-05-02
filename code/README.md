@@ -1,43 +1,101 @@
-# Support triage agent
+# Multi-Domain Support Triage Agent
 
-Terminal workflow:
+An AI-powered terminal-based support triage system built for the Multi-Domain Support Triage Challenge.
 
-1. Index all markdown under `../data/{hackerrank,claude,visa}` into BM25-retrievable chunks (YAML frontmatter titles + breadcrumbs included in the lexical field).
-2. For each ticket row, retrieve top‑K excerpts scoped by `Company` when set (otherwise search all corpora).
-3. Call **OpenAI** (`OPENAI_API_KEY`) or **Anthropic** (`ANTHROPIC_API_KEY`) with temperature `0` and JSON output, instructing the model to ground answers only in those excerpts and to escalate when excerpts are insufficient or risk is high.
-4. Apply conservative regex overrides for prompt injection, broad outages, score disputes, billing identifiers, merchant‑dispute demands, and non‑admin workspace access restoration — forcing `escalated` with an appended justification reason.
+This agent processes support tickets across multiple ecosystems and determines the safest and most relevant action for each case.
 
-## Setup
+Supported domains:
 
-```bash
-cd code
-python3 -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-Create `../.env` or export API keys in your shell.
-```
+- HackerRank
+- Claude (Anthropic)
+- Visa
 
-Set one of:
+---
 
-- `OPENAI_API_KEY` (optional `OPENAI_MODEL`, default `gpt-4o-mini`)
-- `ANTHROPIC_API_KEY` (optional `ANTHROPIC_MODEL`, default `claude-3-5-haiku-latest`)
+# Overview
 
-Optional: `RETRIEVAL_TOP_K` (default `8`).
+The system reads incoming support tickets from a CSV file and automatically classifies each request into:
 
-## Run
+- Request type
+- Product area
+- Risk level
+- Direct reply vs escalation
 
-From repo root (paths default to `support_tickets/support_tickets.csv` → `support_tickets/output.csv`):
+It then generates a structured CSV output ready for submission.
 
-```bash
-cd code
-source .venv/bin/activate
-python main.py
-```
+---
 
-Flags:
+# Key Features
 
-```bash
-python main.py --input ../support_tickets/support_tickets.csv --output ../support_tickets/output.csv --limit 5
-```
+## Intelligent Ticket Classification
 
-No live HTTP calls are made for answers; only local files under `data/` feed retrieval.
+Detects categories such as:
+
+- Billing
+- Fraud
+- Security
+- Privacy
+- Account Management
+- Assessment Issues
+- Subscription Requests
+- Service Outages
+
+---
+
+## Safety-First Escalation Logic
+
+Automatically escalates high-risk or sensitive cases, including:
+
+- Fraud / identity theft
+- Security vulnerabilities
+- Payment disputes
+- Score disputes
+- Unauthorized access requests
+- Prompt injection attempts
+- Malicious requests
+
+---
+
+## Multi-Domain Routing
+
+Understands company context and routes requests accordingly:
+
+- HackerRank → assessments, hiring, subscriptions
+- Claude → workspace access, privacy, outages
+- Visa → billing, fraud, merchant disputes
+
+---
+
+## Retrieval-Based Reasoning
+
+Uses BM25 retrieval over the provided support corpus to find relevant documentation excerpts before generating decisions.
+
+This helps reduce hallucinations and keep responses grounded.
+
+---
+
+# Tech Stack
+
+- Python
+- Pandas
+- BM25 (rank_bm25)
+- Rule-based safety engine
+- CSV batch processing
+- Optional LLM integration
+
+---
+
+# Project Structure
+
+```text
+code/
+ ├── main.py
+ ├── agent.py
+ ├── safety.py
+ ├── retrieve.py
+ ├── llm_client.py
+
+support_tickets/
+ ├── sample_support_tickets.csv
+ ├── support_tickets.csv
+ └── output.csv

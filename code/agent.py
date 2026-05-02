@@ -55,6 +55,20 @@ def _validate(pred: dict[str, Any]) -> dict[str, Any]:
         "request_type": rt,
     }
 
+def infer_company(issue: str) -> str | None:
+    text = issue.lower()
+
+    if "card" in text or "payment" in text or "charged" in text:
+        return "visa"
+
+    if "workspace" in text or "seat" in text or "claude" in text:
+        return "claude"
+
+    if "score" in text or "test" in text or "submission" in text:
+        return "hackerrank"
+
+    return None
+
 
 class SupportAgent:
     def __init__(self, top_k: int | None = None) -> None:
@@ -82,6 +96,10 @@ class SupportAgent:
         force_escalate: SafetyDecision | None = None,
     ) -> dict[str, Any]:
         company = _normalize_company(company_raw)
+
+        if company is None:
+         company = infer_company(issue)
+
 
         if trivial_invalid_greeting(issue, subject):
             return {
